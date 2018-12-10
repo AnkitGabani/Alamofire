@@ -1,0 +1,52 @@
+// Pod install 
+pod 'Alamofire', '~> 4.7.0'
+
+// client Id and key 
+pod 'BCryptSwift', '~> 1.0'
+
+import Alamofire
+import BCryptSwift
+
+class APIClient: NSObject, NSURLConnectionDataDelegate {
+    
+    class var sharedInstance: APIClient {
+        
+        struct Static {
+            static let instance: APIClient = APIClient()
+        }
+        return Static.instance
+    }
+    
+    //----------------------------- for Login ----------------------------- 
+    
+    func MakeLoginAPICall(email: String, password: String, completionHandler:@escaping (NSDictionary?, Error?, Int?) -> Void) {
+    
+        let parameters = ["emailaddress": email, "password": password]
+        
+        UserDefaults.standard.set(email, forKey: "currentUserEmail")
+        UserDefaults.standard.set(password, forKey: "currentUserPassword")
+        UserDefaults.standard.synchronize()
+        
+        let salt = BCryptSwift.generateSaltWithNumberOfRounds(10)
+
+            let obfuscstorId = Obfuscator(withSalt: [AppDelegate.self, NSObject.self, NSString.self])
+            let clientSecret = obfuscstorId.reveal(key: CLIENT_API_SECRET)
+            print(clientSecret)
+
+            if let authcode = BCryptSwift.hashPassword(email+password+clientSecret, withSalt: salt)
+            {
+                
+            let obfuscstorId = Obfuscator(withSalt: [AppDelegate.self, NSObject.self, NSString.self])
+            let clientId = obfuscstorId.reveal(key: CLIENT_API_ID)
+            print(clientId)
+
+            let credentialData = "\(clientId):\(authcode)".data(using: String.Encoding.utf8)!
+            let base64Credentials = credentialData.base64EncodedString(options: [])
+            let headers = ["Authorization": "Basic \(base64Credentials)"]
+            
+            
+        
+    }
+    
+
+}
