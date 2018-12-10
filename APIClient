@@ -27,6 +27,8 @@ class APIClient: NSObject, NSURLConnectionDataDelegate {
         UserDefaults.standard.set(password, forKey: "currentUserPassword")
         UserDefaults.standard.synchronize()
         
+        if NetConnection.isConnectedToNetwork() == true {
+        
         let salt = BCryptSwift.generateSaltWithNumberOfRounds(10)
 
             let obfuscstorId = Obfuscator(withSalt: [AppDelegate.self, NSObject.self, NSString.self])
@@ -66,7 +68,9 @@ class APIClient: NSObject, NSURLConnectionDataDelegate {
             }else
             {
                 print("Could not generate hash for password")
-            }            
+            }  
+            
+          }
         
     }
     
@@ -121,6 +125,9 @@ class APIClient: NSObject, NSURLConnectionDataDelegate {
     //----------------------------- for without auth header ----------------------------- 
     
     func MakeAPICallWithoutAuthHeader(_ url: String, parameters: [String: Any], completionHandler:@escaping (NSDictionary?, Error?, Int?) -> Void) {
+    
+    if NetConnection.isConnectedToNetwork() == true {
+    
             Alamofire.request(BASE_URL + url, method: .post, parameters: parameters, encoding: URLEncoding(destination: .httpBody), headers: [:]).responseJSON { response in
                 
                 switch(response.result) {
@@ -143,6 +150,8 @@ class APIClient: NSObject, NSURLConnectionDataDelegate {
                 }
             }
             
+          }
+            
          //----------------------------- for MakeAPICallWithArrayResponse ----------------------------- 
          
          func MakeAPICallWithArrayResponse(_ url: String, parameters: [String: Any], completionHandler:@escaping (NSArray?, Error?, Int?) -> Void) {
@@ -150,6 +159,8 @@ class APIClient: NSObject, NSURLConnectionDataDelegate {
                 if let authToken = UserDefaults.standard.value(forKey: "userAuthToken") as? String {
                 
                  let authorizationStr = "Bearer " + authToken
+                 
+                 if NetConnection.isConnectedToNetwork() == true { 
                                     Alamofire.request(BASE_URL + url, method: .post, parameters: parameters, encoding: URLEncoding(destination: .httpBody), headers: ["Authorization": authorizationStr]).responseJSON { response in
                 
                 switch(response.result) {
@@ -191,10 +202,239 @@ class APIClient: NSObject, NSURLConnectionDataDelegate {
 
                 }
          }
+       }
     } else {
         reAuthenticateAndCallAPIAgain { (_, _) in
     }
+ }
+ 
+ //----------------------------- for MakePostAPICallWithEndURl ----------------------------- 
+ 
+ func MakePostAPICallWithEndURl(_ url: String, parameters: [String: Any], completionHandler:@escaping (NSDictionary?, Error?, Int?) -> Void) {
+ 
+ if let authToken = UserDefaults.standard.value(forKey: "userAuthToken") as? String
+    {
+      
+      let authorizationStr = "Bearer " + authToken
+      
+      if NetConnection.isConnectedToNetwork() == true
+      {
+        
+        Alamofire.request(BASE_URL + url, method: .post, parameters: parameters, encoding: URLEncoding(destination: .httpBody), headers: ["Authorization": authorizationStr]).responseJSON { response in
+          
+          switch(response.result) {
+            
+          case .success:
+            if response.result.value != nil {
+              if let responseDict = ((response.result.value as AnyObject) as? NSDictionary) {
+                completionHandler(responseDict, nil, response.response?.statusCode)
+              }
+              
+            }
+            
+            
+          case .failure:
+            print(response.result.error!)
+            print("Http Status Code:\(String(describing: response.response?.statusCode))")
+            completionHandler(nil, response.result.error, response.response?.statusCode )
+            
+          }
+        }
+        
+      }
+      
     }
+    
+ }
+ 
+ //----------------------------- for postProfileImageToServer ----------------------------- 
+ 
+ 
+   func postProfileImageToServer(_ url: String, image: UIImage!, parameters: [String: Any], completionHandler:@escaping (NSDictionary?, Error?, Int?) -> Void){
+
+    let finalUrl = BASE_URL + url
+    print("Requesting \(finalUrl)")
+    print("Parameters: \(parameters)")
+
+    let imageData = UIImageJPEGRepresentation(image!, 1)
+
+    if let authToken = UserDefaults.standard.value(forKey: "userAuthToken") as? String
+    {
+
+      let authorizationStr = "Bearer " + authToken
+
+      if NetConnection.isConnectedToNetwork() == true
+      {
+
+        if (imageData != nil)
+        {
+
+          let headers: HTTPHeaders = [
+            /* "Authorization": "your_access_token",  in case you need authorization header */
+            "Content-type": "multipart/form-data",
+            "Authorization": authorizationStr
+          ]
+
+          Alamofire.upload(multipartFormData: { (multipartFormData) in
+            for (key, value) in parameters {
+              multipartFormData.append("\(value)".data(using: String.Encoding.utf8)!, withName: key as String)
+            }
+            multipartFormData.append(imageData!, withName: "photofile", fileName: "photo.jpg", mimeType: "image/jpeg")
+
+          }, usingThreshold: UInt64.init(), to: finalUrl, method: .post, headers: headers) { (result) in
+            switch result{
+            case .success(let upload, _, _):
+              upload.responseJSON { response in
+                print("Succesfully uploaded")
+                if let err = response.error{
+                  completionHandler(nil, err, response.response?.statusCode )
+
+                  return
+                }
+                if let responseDict = ((response.result.value as AnyObject) as? NSDictionary) {
+                  completionHandler(responseDict, nil, response.response?.statusCode)
+                }
+
+
+              }
+            case .failure(let error):
+              print("Error in upload: \(error.localizedDescription)")
+              completionHandler(nil, error, -1 )
+            }
+          }
+        }
+      }
+    }
+  }
+    
+    
+     //----------------------------- for postImageToServer ----------------------------- 
+    
+    func postImageToServer(_ url: String, image: UIImage!, parameters: [String: Any], completionHandler:@escaping (NSDictionary?, Error?, Int?) -> Void){
+        
+        let finalUrl = BASE_URL + url
+        print("Requesting \(finalUrl)")
+        print("Parameters: \(parameters)")
+        
+        let imageData = UIImageJPEGRepresentation(image!, 0.1)
+        
+        if let authToken = UserDefaults.standard.value(forKey: "userAuthToken") as? String
+        {
+            
+        let authorizationStr = "Bearer " + authToken
+        
+            if NetConnection.isConnectedToNetwork() == true
+            {
+                //        let imageData  = UIImagePNGRepresentation(image)
+                
+                if (imageData != nil)
+                {
+                    
+                    let headers: HTTPHeaders = [
+                        /* "Authorization": "your_access_token",  in case you need authorization header */
+                        "Content-type": "multipart/form-data",
+                        "Authorization": authorizationStr
+                    ]
+                    
+                    Alamofire.upload(multipartFormData: { (multipartFormData) in
+                        for (key, value) in parameters {
+                            multipartFormData.append("\(value)".data(using: String.Encoding.utf8)!, withName: key as String)
+                        }
+                        multipartFormData.append(imageData!, withName: "fileupload", fileName: "photo.jpg", mimeType: "image/jpeg")
+                        
+                    }, usingThreshold: UInt64.init(), to: finalUrl, method: .post, headers: headers) { (result) in
+                        switch result{
+                        case .success(let upload, _, _):
+                            upload.responseJSON { response in
+                                print("Succesfully uploaded")
+                                if let err = response.error{
+                                    completionHandler(nil, err, response.response?.statusCode)
+                                    
+                                    return
+                                }
+                              if let responseDict = ((response.result.value as AnyObject) as? NSDictionary) {
+                                completionHandler(responseDict, nil, response.response?.statusCode)
+                              }
+
+                                
+                            }
+                            upload.uploadProgress(closure: { (progrress) in
+                                print(progrress.fractionCompleted)
+                            })
+                        case .failure(let error):
+                            print("Error in upload: \(error.localizedDescription)")
+                            completionHandler(nil, error, -1 )
+                        }
+                    }
+                }
+            }
+    }
+}
+    
+    //----------------------------- for postVideoToServer -----------------------------
+    
+    
+    func postVideoToServer(_ url: String, videoURL: URL!, parameters: [String: Any], completionHandler:@escaping (NSDictionary?, Error?, Int?) -> Void){
+        
+        let finalUrl = BASE_URL + url
+        print("Requesting \(finalUrl)")
+        print("Parameters: \(parameters)")
+        print("videoURL :\(videoURL)")
+        
+//        let imageData = UIImageJPEGRepresentation(UIImage(named: "")!, 0.1)
+        
+        if let authToken = UserDefaults.standard.value(forKey: "userAuthToken") as? String
+        {
+            
+        let authorizationStr = "Bearer " + authToken
+            
+            if NetConnection.isConnectedToNetwork() == true
+            {
+                
+                if (videoURL != nil)
+                {
+                    
+                    let headers: HTTPHeaders = [
+                        /* "Authorization": "your_access_token",  in case you need authorization header */
+                        "Content-type": "multipart/form-data",
+                        "Authorization": authorizationStr
+                    ]
+                    
+                    Alamofire.upload(multipartFormData: { (multipartFormData) in
+                        for (key, value) in parameters {
+                            multipartFormData.append("\(value)".data(using: String.Encoding.utf8)!, withName: key as String)
+                        }
+                        multipartFormData.append(videoURL, withName: "fileupload", fileName: "video.mov", mimeType: "video/quicktime")
+                        
+                        // multipartFormData.append(videoURL, withName: "fileupload")
+                        
+                    }, usingThreshold: UInt64.init(), to: finalUrl, method: .post, headers: headers) { (result) in
+                        switch result{
+                        case .success(let upload, _, _):
+                            upload.responseJSON { response in
+                                print("Succesfully uploaded")
+                                if let err = response.error{
+                                    completionHandler(nil, err, response.response?.statusCode)
+                                    
+                                    return
+                                }
+                              if let responseDict = ((response.result.value as AnyObject) as? NSDictionary) {
+                                 completionHandler(responseDict, nil, response.response?.statusCode)
+                              }
+
+                                
+                            }
+                        case .failure(let error):
+                            print("Error in upload: \(error.localizedDescription)")
+                            completionHandler(nil, error, -1 )
+                        }
+                    }
+                }
+            }
+    }
+    }
+
+    
 
 
 }
