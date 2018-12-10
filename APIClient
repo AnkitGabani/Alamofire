@@ -70,7 +70,131 @@ class APIClient: NSObject, NSURLConnectionDataDelegate {
         
     }
     
-    //----------------------------- for Login ----------------------------- 
+    //----------------------------- for reAuthenticateAndCallAPIAgain ----------------------------- 
     
+    func reAuthenticateAndCallAPIAgain (completionHandler : @escaping (Bool?, Error?) -> Void) {
+        let username =  UserDefaults.standard.value(forKey: "currentUserEmail") as? String ?? ""
+        
+        let password =  UserDefaults.standard.value(forKey: "currentUserPassword") as? String ?? ""
+        
+        if username == ""
+        {
+            NotificationCenter.default.post(name: Notification.Name("NotificationSignOut"), object: nil)
+        }
+        
+        MakeLoginAPICall(email: username, password: password) { (response, error, statusCode) in
+            if error == nil {
+                
+                if (statusCode == 200)
+                {
+                
+                let token = response?["token"] as? String
+                let expiresat = response?["expiresat"] as? Int
+                
+                AppData.sharedInstance.userAuthToken = token
+                UserDefaults.standard.set(token, forKey: "userAuthToken")
+                   UserDefaults.standard.set(expiresat, forKey: "expiresat")
+                UserDefaults.standard.synchronize()
+                    
+                 completionHandler(true, nil)
+                } else
+                {
+                    completionHandler(false, nil)
+                }
+                
+                
+            } else {
+                // Do Logout as could not generate auth token
+                print("\(String(describing: error?.localizedDescription))")
+
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3.1) {
+                    NotificationCenter.default.post(name: Notification.Name("NotificationSignOut"), object: nil)
+                }
+                
+                completionHandler(false, error)
+
+            }
+        }
+        
+    }
+    
+    //----------------------------- for without auth header ----------------------------- 
+    
+    func MakeAPICallWithoutAuthHeader(_ url: String, parameters: [String: Any], completionHandler:@escaping (NSDictionary?, Error?, Int?) -> Void) {
+            Alamofire.request(BASE_URL + url, method: .post, parameters: parameters, encoding: URLEncoding(destination: .httpBody), headers: [:]).responseJSON { response in
+                
+                switch(response.result) {
+                    
+                case .success:
+                    if response.result.value != nil {
+                      if let responseDict = ((response.result.value as AnyObject) as? NSDictionary) {
+                        completionHandler(responseDict, nil, response.response?.statusCode)
+                      }
+
+                    }
+
+                    
+                case .failure:
+                    print(response.result.error!)
+                    
+                    print("Http Status Code: \(String(describing: response.response?.statusCode))")
+                    completionHandler(nil, response.result.error, response.response?.statusCode )
+
+                }
+            }
+            
+         //----------------------------- for MakeAPICallWithArrayResponse ----------------------------- 
+         
+         func MakeAPICallWithArrayResponse(_ url: String, parameters: [String: Any], completionHandler:@escaping (NSArray?, Error?, Int?) -> Void) {
+                
+                if let authToken = UserDefaults.standard.value(forKey: "userAuthToken") as? String {
+                
+                 let authorizationStr = "Bearer " + authToken
+                                    Alamofire.request(BASE_URL + url, method: .post, parameters: parameters, encoding: URLEncoding(destination: .httpBody), headers: ["Authorization": authorizationStr]).responseJSON { response in
+                
+                switch(response.result) {
+                    
+                case .success:
+                    if response.result.value != nil
+                    {
+//                        print(response.result.value)
+                        if (response.response?.statusCode == 200)
+                        {
+                            if let responseArray = response.result.value as? NSArray
+                            {
+                                completionHandler(responseArray, nil, response.response?.statusCode)
+                            }
+                            else
+                            {
+                                let responseArr = NSArray()
+                                completionHandler(responseArr, nil, response.response?.statusCode)
+                            }
+                        }else
+                        {
+                          if let responseDict = ((response.result.value as AnyObject) as? NSDictionary) {
+                            let responseArray: NSArray = [responseDict]
+                            completionHandler(responseArray, nil, response.response?.statusCode)
+                          }
+
+                        }
+                    }
+
+                    
+                case .failure:
+                    print(response.result.error!)
+                    
+                    print("Http Status Code: \(String(describing: response.response?.statusCode))")
+                    completionHandler(nil, response.result.error, response.response?.statusCode )
+
+                }
+            }
+
+                }
+         }
+    } else {
+        reAuthenticateAndCallAPIAgain { (_, _) in
+    }
+    }
+
 
 }
